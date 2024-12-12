@@ -48,7 +48,7 @@ Definition update_st (s : st) (n : nat) (v : value) : st :=
 
 Definition next_loc (n: nat) : nat := S n.
 
-Inductive eval : expr -> nat -> st * env -> nat -> st * env -> Prop :=
+Inductive eval : expr -> nat -> st * env -> nat -> st * env -> Prop := (* -> value and return value *)
   | Ev_Asgn : forall x e n1 n2 s1 s2 env1 env2 v,
       eval e n1 (s1, env1) n2 (s2, env2) ->
       let s3 := update_st s2 n2 v in
@@ -73,6 +73,8 @@ Inductive eval : expr -> nat -> st * env -> nat -> st * env -> Prop :=
       let ptr_val := V_Mem_Loc loc in
       let s3 := update_st s2 n2 ptr_val in
       eval (Ex_Ref e) n1 (s1, env1) (next_loc n2) (s3, env2).
+
+(* Prove that eval is deterministic *)
 
 Definition st_ex : st := 
   fun n => match n with 
