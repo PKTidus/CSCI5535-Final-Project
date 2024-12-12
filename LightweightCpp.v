@@ -73,3 +73,52 @@ Inductive eval : expr -> nat -> st * env -> nat -> st * env -> Prop :=
       let ptr_val := V_Mem_Loc loc in
       let s3 := update_st s2 n2 ptr_val in
       eval (Ex_Ref e) n1 (s1, env1) (next_loc n2) (s3, env2).
+
+(* Typing *)
+Definition gamma := list (string * type).
+
+Fixpoint check_type (x: string) (g: gamma) : option type :=
+  match g with
+  | [] => None
+  | (y, t) :: rest => if string_dec x y then Some t else check_type x rest
+  end.
+
+Inductive is_of_type (g: gamma) : expr -> type -> Prop :=
+  | Ty_Asgn : forall x e T,
+      check_type x g = Some T ->
+      is_of_type g e T ->
+      is_of_type g (Ex_Asgn x e) T
+  | Ty_Var : forall x T,
+      check_type x g = Some T ->
+      is_of_type g (Ex_Variable x) T
+  | Ty_Seq : forall e1 e2 T1 T2,
+      is_of_type g e1 T1 ->
+      is_of_type g e2 T2 ->
+      is_of_type g (Ex_Seq e1 e2) T2
+  | Ty_Deref : forall e T,
+      is_of_type g e (T_Ptr T) ->
+      is_of_type g (Ex_Deref e) T
+  | Ty_Ref : forall e T,
+      is_of_type g e T ->
+      is_of_type g (Ex_Ref e) (T_Ptr T).
+
+Definition X : string := "X".
+Definition Y : string := "Y".
+Definition Z : string := "Z".
+
+Definition gamma_ex : gamma := 
+  [(X, T_Int); 
+   (Y, T_Ptr T_Int);
+   (Z, T_Bool)].
+
+Example type_works :
+  is_of_type gamma_ex (Ex_Variable X) T_Int.
+Proof.
+  apply Ty_Var. simpl. reflexivity.
+Qed.
+
+Example type_works_deref :
+  is_of_type gamma_ex (Ex_Deref (Ex_Variable Y)) T_Int.
+Proof.
+  apply Ty_Deref. apply Ty_Var. simpl. reflexivity.
+Qed.
