@@ -74,6 +74,29 @@ Inductive eval : expr -> nat -> st * env -> nat -> st * env -> Prop :=
       let s3 := update_st s2 n2 ptr_val in
       eval (Ex_Ref e) n1 (s1, env1) (next_loc n2) (s3, env2).
 
+Definition st_ex : st := 
+  fun n => match n with 
+  | 0 => Some (V_Int 42)
+  | 1 => Some (V_Bool true)
+  | 2 => Some (V_Mem_Loc 0)
+  | _ => None
+  end.
+
+Definition env_ex : env :=
+  fun x => 
+    if String.eqb x "x" then Some 0
+    else if String.eqb x "y" then Some 1
+    else if String.eqb x "ptr" then Some 2
+    else None.
+
+Example eval_var :
+  eval (Ex_Variable "x") 3 (st_ex, env_ex) 3 (st_ex, env_ex).
+Proof.
+  apply Ev_Var with (loc := 0) (v := V_Int 42).
+  - simpl. reflexivity.
+  - simpl. reflexivity.
+Qed.
+
 (* Typing *)
 Definition gamma := list (string * type).
 
