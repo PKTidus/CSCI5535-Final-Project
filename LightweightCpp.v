@@ -1,7 +1,10 @@
 (* working title C++ *)
 
 Require Import String.
+Require Import Coq.Lists.List.
+Import ListNotations.
 
+(* Syntax *)
 Inductive type : Type :=
   | T_Int : type              (* int *)
   | T_Bool : type             (* bool *)
@@ -9,18 +12,64 @@ Inductive type : Type :=
   | T_Ptr : type -> type.     (* T* *)
 
 Inductive expr : Type :=
-  | E_Variable : string -> expr                           (* x *)
-  | E_Field_Access : expr -> string -> expr               (* e.f *)
-  | E_Method_Call : expr -> string -> list expr -> expr   (* e.m(e_bar) *)
-  | E_New : string -> list expr -> expr                   (* new C(e_bar) *)
-  | E_Cast : type -> expr -> expr                         (* (C)e *)
-  | E_Deref : expr -> expr                                (* *e *)
-  | E_Ref : expr -> expr                                  (* &e *)
-  | E_Seq : expr -> expr -> expr                          (* e;e *)
-  | E_Asgn : string -> expr -> expr.                      (* T x := e *)
+  | Ex_Variable : string -> expr                           (* x *)
+  | Ex_Field_Access : expr -> string -> expr               (* e.f *)
+  | Ex_Method_Call : expr -> string -> list expr -> expr   (* e.m(e_bar) *)
+  | Ex_New : string -> list expr -> expr                   (* new C(e_bar) *)
+  | Ex_Cast : type -> expr -> expr                         (* (C)e *)
+  | Ex_Deref : expr -> expr                                (* *e *)
+  | Ex_Ref : expr -> expr                                  (* &e *)
+  | Ex_Seq : expr -> expr -> expr                          (* e;e *)
+  | Ex_Asgn : string -> expr -> expr.                      (* T x := e *)
 
 Inductive method : Type :=
   | Method : string -> list (type * string) -> expr -> method.
 
 Inductive class : Type :=
   | Class : string -> string -> list (type * string) -> list method -> class.
+
+(* Evaluation *)
+Inductive value : Type :=
+  | V_Int : nat -> value
+  | V_Bool : bool -> value
+  | V_Object : class -> value
+  | V_Mem_Loc : nat -> value.
+
+Definition env := string -> option nat.
+Definition st := nat -> option value.
+Definition empty_env : env := fun _ => None.
+Definition empty_st : st := fun _ => None.
+
+Definition update_env (e : env) (x : string) (n : nat) : env :=
+  fun y => if String.eqb x y then Some n else e y.
+
+Definition update_st (s : st) (n : nat) (v : value) : st :=
+  fun m => if Nat.eqb n m then Some v else s m.
+
+Definition next_loc (n: nat) : nat := S n.
+
+Inductive eval : expr -> nat -> st * env -> nat -> st * env -> Prop :=
+  | Ev_Asgn : forall x e n1 n2 s1 s2 env1 env2 v,
+      eval e n1 (s1, env1) n2 (s2, env2) ->
+      let s3 := update_st s2 n2 v in
+      let env3 := update_env env2 x n2 in
+      eval (Ex_Asgn x e) n1 (s1, env1) (next_loc n2) (s3, env3)
+  | Ev_Var : forall x n s e loc v,
+      e x = Some loc ->
+      s loc = Some v ->
+      eval (Ex_Variable x) n (s, e) n (s, e)
+  | Ev_Seq : forall e1 e2 n1 n2 n3 s1 s2 s3 env1 env2 env3,
+      eval e1 n1 (s1, env1) n2 (s2, env2) ->
+      eval e2 n2 (s2, env2) n3 (s3, env3) ->
+      eval (Ex_Seq e1 e2) n1 (s1, env1) n3 (s3, env3)
+  | Ev_Deref : forall e n1 n2 s1 s2 env1 env2 loc v,
+      eval e n1 (s1, env1) n2 (s2, env2) ->
+      s2 n2 = Some (V_Mem_Loc loc) ->
+      s2 loc = Some v ->
+      eval (Ex_Deref e) n1 (s1, env1) n2 (s2, env2)
+  | Ev_Ref : forall e n1 n2 s1 s2 env1 env2 loc v,
+      eval e n1 (s1, env1) n2 (s2, env2) ->
+      s2 loc = Some v ->
+      let ptr_val := V_Mem_Loc loc in
+      let s3 := update_st s2 n2 ptr_val in
+      eval (Ex_Ref e) n1 (s1, env1) (next_loc n2) (s3, env2).
