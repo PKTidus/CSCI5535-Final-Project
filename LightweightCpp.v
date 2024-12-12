@@ -12,7 +12,7 @@ Inductive type : Type :=
   | T_Ptr : type -> type.     (* T* *)
 
 Inductive expr : Type :=
-  | Ex_Variable : string -> expr                           (* x *)
+  | Ex_Var : string -> expr                                (* x *)
   | Ex_Field_Access : expr -> string -> expr               (* e.f *)
   | Ex_Method_Call : expr -> string -> list expr -> expr   (* e.m(e_bar) *)
   | Ex_New : string -> list expr -> expr                   (* new C(e_bar) *)
@@ -41,10 +41,10 @@ Definition empty_env : env := fun _ => None.
 Definition empty_st : st := fun _ => None.
 
 Definition update_env (e : env) (x : string) (n : nat) : env :=
-  fun y => if String.eqb x y then Some n else e y.
+  fun f => if String.eqb x f then Some n else e f.
 
 Definition update_st (s : st) (n : nat) (v : value) : st :=
-  fun m => if Nat.eqb n m then Some v else s m.
+  fun f => if Nat.eqb n f then Some v else s f.
 
 Definition next_loc (n: nat) : nat := S n.
 
@@ -57,7 +57,7 @@ Inductive eval : expr -> nat -> st * env -> nat -> st * env -> Prop :=
   | Ev_Var : forall x n s e loc v,
       e x = Some loc ->
       s loc = Some v ->
-      eval (Ex_Variable x) n (s, e) n (s, e)
+      eval (Ex_Var x) n (s, e) n (s, e)
   | Ev_Seq : forall e1 e2 n1 n2 n3 s1 s2 s3 env1 env2 env3,
       eval e1 n1 (s1, env1) n2 (s2, env2) ->
       eval e2 n2 (s2, env2) n3 (s3, env3) ->
@@ -76,23 +76,23 @@ Inductive eval : expr -> nat -> st * env -> nat -> st * env -> Prop :=
 
 Definition st_ex : st := 
   fun n => match n with 
-  | 0 => Some (V_Int 42)
+  | 0 => Some (V_Int 777)
   | 1 => Some (V_Bool true)
   | 2 => Some (V_Mem_Loc 0)
   | _ => None
   end.
 
 Definition env_ex : env :=
-  fun x => 
-    if String.eqb x "x" then Some 0
-    else if String.eqb x "y" then Some 1
-    else if String.eqb x "ptr" then Some 2
+  fun s => 
+    if String.eqb s "x" then Some 0
+    else if String.eqb s "y" then Some 1
+    else if String.eqb s "ptr" then Some 2
     else None.
 
 Example eval_var :
-  eval (Ex_Variable "x") 3 (st_ex, env_ex) 3 (st_ex, env_ex).
+  eval (Ex_Var "x") 3 (st_ex, env_ex) 3 (st_ex, env_ex).
 Proof.
-  apply Ev_Var with (loc := 0) (v := V_Int 42).
+  apply Ev_Var with (loc := 0) (v := V_Int 777).
   - simpl. reflexivity.
   - simpl. reflexivity.
 Qed.
@@ -113,7 +113,7 @@ Inductive is_of_type (g: gamma) : expr -> type -> Prop :=
       is_of_type g (Ex_Asgn x e) T
   | Ty_Var : forall x T,
       check_type x g = Some T ->
-      is_of_type g (Ex_Variable x) T
+      is_of_type g (Ex_Var x) T
   | Ty_Seq : forall e1 e2 T1 T2,
       is_of_type g e1 T1 ->
       is_of_type g e2 T2 ->
@@ -135,13 +135,13 @@ Definition gamma_ex : gamma :=
    (Z, T_Bool)].
 
 Example type_works :
-  is_of_type gamma_ex (Ex_Variable X) T_Int.
+  is_of_type gamma_ex (Ex_Var X) T_Int.
 Proof.
   apply Ty_Var. simpl. reflexivity.
 Qed.
 
 Example type_works_deref :
-  is_of_type gamma_ex (Ex_Deref (Ex_Variable Y)) T_Int.
+  is_of_type gamma_ex (Ex_Deref (Ex_Var Y)) T_Int.
 Proof.
   apply Ty_Deref. apply Ty_Var. simpl. reflexivity.
 Qed.
